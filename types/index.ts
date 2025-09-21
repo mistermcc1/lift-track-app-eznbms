@@ -81,3 +81,37 @@ export interface UserProfile {
     fat: number;
   };
 }
+
+// AI-related types
+export interface AIFoodSuggestion {
+  id: string;
+  name: string;
+  confidence: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  servingSize: string;
+  brand?: string;
+  category: string;
+}
+
+export interface AIAnalysisResult {
+  suggestions: AIFoodSuggestion[];
+  analysisType: 'image' | 'text';
+  confidence: number;
+  processingTime: number;
+}
+
+export interface NutritionalDatabase {
+  [key: string]: {
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    servingSize: string;
+    category: string;
+    aliases: string[];
+  };
+}

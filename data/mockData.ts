@@ -66,10 +66,10 @@ export const mockPersonalRecords: PersonalRecord[] = [
 
 export const mockDailyNutrition: DailyNutrition = {
   date: new Date().toISOString().split('T')[0],
-  calories: 1850,
-  protein: 140,
-  carbs: 180,
-  fat: 65,
+  calories: 1250,
+  protein: 95,
+  carbs: 120,
+  fat: 45,
   meals: [
     {
       id: '1',
@@ -90,9 +90,63 @@ export const mockDailyNutrition: DailyNutrition = {
           id: '2',
           name: 'Banana',
           calories: 105,
-          protein: 1,
+          protein: 1.3,
           carbs: 27,
+          fat: 0.4,
+          quantity: 1,
+          unit: 'medium'
+        }
+      ]
+    },
+    {
+      id: '2',
+      name: 'Lunch',
+      timestamp: new Date(),
+      foods: [
+        {
+          id: '3',
+          name: 'Chicken Breast',
+          calories: 231,
+          protein: 43.5,
+          carbs: 0,
+          fat: 5,
+          quantity: 1,
+          unit: 'serving'
+        },
+        {
+          id: '4',
+          name: 'White Rice',
+          calories: 205,
+          protein: 4.3,
+          carbs: 45,
+          fat: 0.4,
+          quantity: 1,
+          unit: 'cup'
+        }
+      ]
+    },
+    {
+      id: '3',
+      name: 'Snacks',
+      timestamp: new Date(),
+      foods: [
+        {
+          id: '5',
+          name: 'Greek Yogurt',
+          calories: 100,
+          protein: 17,
+          carbs: 6,
           fat: 0,
+          quantity: 1,
+          unit: 'container'
+        },
+        {
+          id: '6',
+          name: 'Apple',
+          calories: 95,
+          protein: 0.5,
+          carbs: 25,
+          fat: 0.3,
           quantity: 1,
           unit: 'medium'
         }

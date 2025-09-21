@@ -1,51 +1,45 @@
 
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { mockDailyNutrition, mockUserProfile } from '../data/mockData';
-import { FoodItem, Meal } from '../types';
+import { FoodItem, Meal, AIFoodSuggestion } from '../types';
 import NutritionCard from '../components/NutritionCard';
 import Icon from '../components/Icon';
-import SimpleBottomSheet from '../components/BottomSheet';
+import AIFoodInput from '../components/AIFoodInput';
 
 export default function NutritionScreen() {
   const [nutrition, setNutrition] = useState(mockDailyNutrition);
-  const [showAddFood, setShowAddFood] = useState(false);
+  const [showAIInput, setShowAIInput] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<string>('');
-  const [newFood, setNewFood] = useState({
-    name: '',
-    calories: '',
-    protein: '',
-    carbs: '',
-    fat: '',
-    quantity: '1',
-    unit: 'serving'
-  });
 
   const profile = mockUserProfile;
 
   const handleAddFood = (mealName: string) => {
     console.log('Adding food to meal:', mealName);
     setSelectedMeal(mealName);
-    setShowAddFood(true);
+    setShowAIInput(true);
   };
 
-  const handleSaveFood = () => {
-    if (!newFood.name || !newFood.calories) {
-      console.log('Missing required fields');
-      return;
-    }
+  const handleFoodSelected = (suggestion: AIFoodSuggestion, quantity: number) => {
+    console.log('Food selected:', suggestion.name, 'quantity:', quantity);
+
+    // Calculate adjusted macros based on quantity
+    const adjustedCalories = Math.round(suggestion.calories * quantity);
+    const adjustedProtein = Math.round(suggestion.protein * quantity * 10) / 10;
+    const adjustedCarbs = Math.round(suggestion.carbs * quantity * 10) / 10;
+    const adjustedFat = Math.round(suggestion.fat * quantity * 10) / 10;
 
     const foodItem: FoodItem = {
       id: Date.now().toString(),
-      name: newFood.name,
-      calories: parseInt(newFood.calories),
-      protein: parseInt(newFood.protein) || 0,
-      carbs: parseInt(newFood.carbs) || 0,
-      fat: parseInt(newFood.fat) || 0,
-      quantity: parseInt(newFood.quantity) || 1,
-      unit: newFood.unit
+      name: suggestion.name,
+      calories: adjustedCalories,
+      protein: adjustedProtein,
+      carbs: adjustedCarbs,
+      fat: adjustedFat,
+      quantity: quantity,
+      unit: 'serving'
     };
 
     // Find or create meal
@@ -71,27 +65,50 @@ export default function NutritionScreen() {
       ...nutrition,
       meals: updatedMeals,
       calories: nutrition.calories + foodItem.calories,
-      protein: nutrition.protein + foodItem.protein,
-      carbs: nutrition.carbs + foodItem.carbs,
-      fat: nutrition.fat + foodItem.fat
+      protein: Math.round((nutrition.protein + foodItem.protein) * 10) / 10,
+      carbs: Math.round((nutrition.carbs + foodItem.carbs) * 10) / 10,
+      fat: Math.round((nutrition.fat + foodItem.fat) * 10) / 10
     };
 
     setNutrition(updatedNutrition);
-    setShowAddFood(false);
-    setNewFood({
-      name: '',
-      calories: '',
-      protein: '',
-      carbs: '',
-      fat: '',
-      quantity: '1',
-      unit: 'serving'
-    });
-    console.log('Food added successfully');
+    setShowAIInput(false);
+    console.log('Food added successfully with AI assistance');
   };
 
   const getMealCalories = (meal: Meal) => {
     return meal.foods.reduce((total, food) => total + food.calories, 0);
+  };
+
+  const handleRemoveFood = (mealId: string, foodId: string) => {
+    console.log('Removing food:', foodId, 'from meal:', mealId);
+    
+    const updatedMeals = nutrition.meals.map(meal => {
+      if (meal.id === mealId) {
+        const foodToRemove = meal.foods.find(food => food.id === foodId);
+        if (foodToRemove) {
+          // Update nutrition totals
+          const updatedNutrition = {
+            ...nutrition,
+            calories: nutrition.calories - foodToRemove.calories,
+            protein: Math.round((nutrition.protein - foodToRemove.protein) * 10) / 10,
+            carbs: Math.round((nutrition.carbs - foodToRemove.carbs) * 10) / 10,
+            fat: Math.round((nutrition.fat - foodToRemove.fat) * 10) / 10
+          };
+          setNutrition(updatedNutrition);
+        }
+        
+        return {
+          ...meal,
+          foods: meal.foods.filter(food => food.id !== foodId)
+        };
+      }
+      return meal;
+    }).filter(meal => meal.foods.length > 0); // Remove empty meals
+
+    setNutrition(prev => ({
+      ...prev,
+      meals: updatedMeals
+    }));
   };
 
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -109,6 +126,10 @@ export default function NutritionScreen() {
               day: 'numeric' 
             })}
           </Text>
+          <View style={styles.aiIndicator}>
+            <Icon name="sparkles" size={16} color={colors.secondary} />
+            <Text style={styles.aiText}>AI-Powered Tracking</Text>
+          </View>
         </View>
 
         {/* Daily Overview */}
@@ -165,8 +186,12 @@ export default function NutritionScreen() {
                     <Text style={styles.mealName}>{mealType}</Text>
                     <Text style={styles.mealCalories}>{calories} calories</Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleAddFood(mealType)}>
-                    <Icon name="add-circle" size={24} color={colors.primary} />
+                  <TouchableOpacity 
+                    style={styles.addButton}
+                    onPress={() => handleAddFood(mealType)}
+                  >
+                    <Icon name="sparkles" size={16} color={colors.background} />
+                    <Text style={styles.addButtonText}>AI Add</Text>
                   </TouchableOpacity>
                 </View>
                 
@@ -177,10 +202,16 @@ export default function NutritionScreen() {
                       <Text style={styles.foodDetails}>
                         {food.quantity} {food.unit} • {food.calories} cal
                       </Text>
+                      <Text style={styles.foodMacros}>
+                        P: {food.protein}g • C: {food.carbs}g • F: {food.fat}g
+                      </Text>
                     </View>
-                    <Text style={styles.foodMacros}>
-                      P: {food.protein}g C: {food.carbs}g F: {food.fat}g
-                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => handleRemoveFood(meal.id, food.id)}
+                      style={styles.removeButton}
+                    >
+                      <Icon name="close-circle" size={20} color={colors.error} />
+                    </TouchableOpacity>
                   </View>
                 ))}
               </View>
@@ -188,95 +219,47 @@ export default function NutritionScreen() {
           })}
         </View>
 
+        {/* AI Insights */}
+        <View style={commonStyles.section}>
+          <Text style={commonStyles.subtitle}>AI Insights</Text>
+          <View style={[commonStyles.card, styles.insightsCard]}>
+            <View style={styles.insightItem}>
+              <Icon name="trending-up" size={20} color={colors.secondary} />
+              <Text style={styles.insightText}>
+                You&apos;re {Math.round(((nutrition.protein / profile.goals.protein) * 100))}% towards your protein goal
+              </Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Icon name="lightbulb" size={20} color={colors.accent} />
+              <Text style={styles.insightText}>
+                Consider adding more vegetables for micronutrients
+              </Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Icon name="water" size={20} color={colors.primary} />
+              <Text style={styles.insightText}>
+                Don&apos;t forget to stay hydrated throughout the day
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* Bottom spacing */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Add Food Bottom Sheet */}
-      <SimpleBottomSheet
-        isVisible={showAddFood}
-        onClose={() => setShowAddFood(false)}
+      {/* AI Food Input Modal */}
+      <Modal
+        visible={showAIInput}
+        animationType="slide"
+        presentationStyle="pageSheet"
       >
-        <View style={styles.bottomSheetContent}>
-          <Text style={styles.bottomSheetTitle}>Add Food to {selectedMeal}</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Food Name</Text>
-            <TextInput
-              style={styles.input}
-              value={newFood.name}
-              onChangeText={(text) => setNewFood({ ...newFood, name: text })}
-              placeholder="Enter food name"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-
-          <View style={styles.inputRow}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.inputLabel}>Calories</Text>
-              <TextInput
-                style={styles.input}
-                value={newFood.calories}
-                onChangeText={(text) => setNewFood({ ...newFood, calories: text })}
-                placeholder="0"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.inputLabel}>Quantity</Text>
-              <TextInput
-                style={styles.input}
-                value={newFood.quantity}
-                onChangeText={(text) => setNewFood({ ...newFood, quantity: text })}
-                placeholder="1"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputRow}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 4 }]}>
-              <Text style={styles.inputLabel}>Protein (g)</Text>
-              <TextInput
-                style={styles.input}
-                value={newFood.protein}
-                onChangeText={(text) => setNewFood({ ...newFood, protein: text })}
-                placeholder="0"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1, marginHorizontal: 4 }]}>
-              <Text style={styles.inputLabel}>Carbs (g)</Text>
-              <TextInput
-                style={styles.input}
-                value={newFood.carbs}
-                onChangeText={(text) => setNewFood({ ...newFood, carbs: text })}
-                placeholder="0"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 4 }]}>
-              <Text style={styles.inputLabel}>Fat (g)</Text>
-              <TextInput
-                style={styles.input}
-                value={newFood.fat}
-                onChangeText={(text) => setNewFood({ ...newFood, fat: text })}
-                placeholder="0"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.saveButton} onPress={handleSaveFood}>
-            <Text style={styles.saveButtonText}>Add Food</Text>
-          </TouchableOpacity>
-        </View>
-      </SimpleBottomSheet>
+        <AIFoodInput
+          mealType={selectedMeal}
+          onFoodSelected={handleFoodSelected}
+          onClose={() => setShowAIInput(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -296,6 +279,21 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  aiIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: colors.secondaryLight,
+    borderRadius: 12,
+  },
+  aiText: {
+    fontSize: 12,
+    color: colors.secondary,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   nutritionGrid: {
     flexDirection: 'row',
     marginBottom: 12,
@@ -313,11 +311,25 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  addButtonText: {
+    color: colors.background,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   foodItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
+    alignItems: 'flex-start',
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -337,49 +349,23 @@ const styles = StyleSheet.create({
   foodMacros: {
     fontSize: 12,
     color: colors.textSecondary,
+    marginTop: 2,
   },
-  bottomSheetContent: {
-    padding: 20,
+  removeButton: {
+    padding: 4,
   },
-  bottomSheetTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 20,
-    textAlign: 'center',
+  insightsCard: {
+    backgroundColor: colors.surface,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputRow: {
+  insightItem: {
     flexDirection: 'row',
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.background,
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 12,
   },
-  saveButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '600',
+  insightText: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 12,
+    flex: 1,
   },
 });
